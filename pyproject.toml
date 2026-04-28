@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "singbox-gui"
+version = "0.1.0"
+description = "Small Linux tray GUI for managing sing-box service profiles"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "PySide6>=6.6",
+]
+
+[project.scripts]
+singbox-gui = "singbox_gui.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+singbox_gui = ["assets/*.svg"]

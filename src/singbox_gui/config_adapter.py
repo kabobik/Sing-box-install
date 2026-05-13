@@ -32,6 +32,12 @@ LINUX_UNSUPPORTED_FIELDS: tuple[tuple[tuple[str, ...], str], ...] = (
     ),
 )
 
+STRICT_ROUTE_REDIRECT_REASON = (
+    "при auto_redirect и route.auto_detect_interface/default_interface strict_route может вернуть "
+    "собственные outbound-подключения sing-box обратно в TUN; отключено, чтобы избежать "
+    "петли proxy/DNS"
+)
+
 
 def adapt_config_for_linux(text: str) -> AdaptationResult:
     data = json.loads(text)
@@ -41,6 +47,8 @@ def adapt_config_for_linux(text: str) -> AdaptationResult:
     for path, reason in LINUX_UNSUPPORTED_FIELDS:
         if _delete_path(adapted, path):
             changes.append(AdaptationChange(".".join(path), reason))
+
+    changes.extend(_disable_tun_strict_route_redirect_loop(adapted))
 
     if not changes:
         return AdaptationResult(text, ())
@@ -67,3 +75,46 @@ def _delete_path(data: Any, path: tuple[str, ...]) -> bool:
 
     del current[leaf]
     return True
+
+
+def _disable_tun_strict_route_redirect_loop(data: Any) -> list[AdaptationChange]:
+    if not isinstance(data, dict):
+        return []
+
+    route = data.get("route")
+    if not _route_binds_outbound_interface(route):
+        return []
+
+    inbounds = data.get("inbounds")
+    if not isinstance(inbounds, list):
+        return []
+
+    changes: list[AdaptationChange] = []
+    for index, inbound in enumerate(inbounds):
+        if not isinstance(inbound, dict):
+            continue
+        if inbound.get("type") != "tun":
+            continue
+        if inbound.get("auto_redirect") is not True:
+            continue
+        if inbound.get("strict_route") is not True:
+            continue
+
+        inbound["strict_route"] = False
+        changes.append(
+            AdaptationChange(
+                f"inbounds[{index}].strict_route",
+                STRICT_ROUTE_REDIRECT_REASON,
+            )
+        )
+
+    return changes
+
+
+def _route_binds_outbound_interface(route: Any) -> bool:
+    if not isinstance(route, dict):
+        return False
+    if route.get("auto_detect_interface") is True:
+        return True
+    default_interface = route.get("default_interface")
+    return isinstance(default_interface, str) and bool(default_interface.strip())

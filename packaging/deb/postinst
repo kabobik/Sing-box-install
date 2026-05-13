@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+chmod 0755 /usr/bin/singbox-gui
+chmod 0755 /usr/lib/singbox-gui/singbox-gui-helper
+chmod 0644 /usr/share/polkit-1/actions/org.singbox.gui.policy
+
+chown root:root /usr/bin/singbox-gui
+chown root:root /usr/lib/singbox-gui/singbox-gui-helper
+chown root:root /usr/share/polkit-1/actions/org.singbox.gui.policy
+
+if command -v pkaction >/dev/null 2>&1; then
+  pkaction --action-id org.singbox.gui.manage >/dev/null 2>&1 || true
+fi
+
+exit 0

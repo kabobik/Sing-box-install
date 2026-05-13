@@ -1,0 +1,13 @@
+Package: singbox-gui
+Version: @VERSION@
+Section: net
+Priority: optional
+Architecture: @ARCH@
+Maintainer: anton <anton@localhost>
+Depends: python3 (>= 3.10), sing-box, systemd, policykit-1 | polkitd
+Installed-Size: @INSTALLED_SIZE@
+Description: Tray GUI for managing sing-box service profiles
+ A small Linux tray GUI for the system sing-box.service.
+ It stores user profiles, validates sing-box JSON configs, adapts known
+ Android-only fields for Linux, and applies configs through a restricted
+ PolicyKit helper.

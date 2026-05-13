@@ -1,0 +1,154 @@
+#!/usr/bin/python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import shutil
+import stat
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+SERVICE_NAME = "sing-box.service"
+SYSTEMCTL = Path("/usr/bin/systemctl")
+SING_BOX = Path("/usr/bin/sing-box")
+TARGET_CONFIG = Path("/etc/sing-box/config.json")
+BACKUP_DIR = Path("/etc/sing-box/backups")
+
+
+def fail(message: str, code: int = 1) -> None:
+    raise SystemExit(f"singbox-gui-helper: {message}")
+
+
+def require_root() -> None:
+    if os.geteuid() != 0:
+        fail("this helper must run as root through pkexec")
+
+
+def invoking_uid() -> int:
+    value = os.environ.get("PKEXEC_UID")
+    if not value:
+        fail("PKEXEC_UID is missing")
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise SystemExit("singbox-gui-helper: PKEXEC_UID is invalid") from exc
+
+
+def validate_user_config_path(path: Path) -> Path:
+    source = path.expanduser().resolve(strict=True)
+    file_stat = source.stat()
+
+    if not stat.S_ISREG(file_stat.st_mode):
+        fail(f"source config is not a regular file: {source}")
+
+    uid = invoking_uid()
+    if file_stat.st_uid != uid:
+        fail("source config must be owned by the invoking user")
+
+    if file_stat.st_mode & stat.S_IWOTH:
+        fail("source config must not be world-writable")
+
+    return source
+
+
+def run_checked(args: list[str], *, timeout: int = 60) -> None:
+    completed = subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+    if completed.returncode != 0:
+        output = "\n".join(
+            part.strip() for part in (completed.stdout, completed.stderr) if part.strip()
+        )
+        fail(output or f"command failed: {' '.join(args)}")
+
+
+def check_config(source: Path) -> str:
+    text = source.read_text(encoding="utf-8")
+    try:
+        json.loads(text)
+    except json.JSONDecodeError as exc:
+        fail(f"source config is not valid JSON: {exc}")
+
+    if not SING_BOX.exists():
+        fail(f"sing-box binary not found: {SING_BOX}")
+
+    run_checked([str(SING_BOX), "check", "-c", str(source)], timeout=30)
+    return text
+
+
+def deploy_config(path: Path) -> int:
+    require_root()
+    source = validate_user_config_path(path)
+    text = check_config(source)
+
+    TARGET_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+    if TARGET_CONFIG.exists():
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup = BACKUP_DIR / f"config.json.{stamp}.bak"
+        shutil.copy2(TARGET_CONFIG, backup)
+        os.chown(backup, 0, 0)
+        os.chmod(backup, 0o600)
+
+    temp_target = TARGET_CONFIG.with_suffix(".json.tmp")
+    temp_target.write_text(text, encoding="utf-8")
+    os.chown(temp_target, 0, 0)
+    os.chmod(temp_target, 0o644)
+    temp_target.replace(TARGET_CONFIG)
+    return 0
+
+
+def service_action(action: str) -> int:
+    require_root()
+    if action not in {"start", "stop", "restart"}:
+        fail(f"unsupported service action: {action}")
+    if not SYSTEMCTL.exists():
+        fail(f"systemctl not found: {SYSTEMCTL}")
+    run_checked([str(SYSTEMCTL), action, SERVICE_NAME], timeout=120)
+    return 0
+
+
+def self_test() -> int:
+    require_root()
+    print("singbox-gui-helper ok")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    deploy_parser = subparsers.add_parser("deploy-config")
+    deploy_parser.add_argument("source")
+
+    subparsers.add_parser("start-service")
+    subparsers.add_parser("stop-service")
+    subparsers.add_parser("restart-service")
+    subparsers.add_parser("self-test")
+
+    args = parser.parse_args(argv)
+    if args.command == "deploy-config":
+        return deploy_config(Path(args.source))
+    if args.command == "start-service":
+        return service_action("start")
+    if args.command == "stop-service":
+        return service_action("stop")
+    if args.command == "restart-service":
+        return service_action("restart")
+    if args.command == "self-test":
+        return self_test()
+
+    fail(f"unknown command: {args.command}")
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

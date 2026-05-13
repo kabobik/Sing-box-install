@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
         self.restart_action = QAction("Перезапустить", self)
         self.restart_action.triggered.connect(self.restart_service)
 
-        self.refresh_logs_action = QAction("Обновить ошибки", self)
+        self.refresh_logs_action = QAction("Обновить лог", self)
         self.refresh_logs_action.triggered.connect(self.refresh_logs)
 
         self.quit_action = QAction("Выход", self)
@@ -114,11 +114,11 @@ class MainWindow(QMainWindow):
         status_layout.addWidget(self.active_profile_label)
         status_layout.addLayout(button_row)
 
-        log_box = QGroupBox("Последние ошибки")
+        log_box = QGroupBox("Журнал sing-box")
         log_layout = QVBoxLayout(log_box)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
-        self.refresh_logs_button = QPushButton("Обновить ошибки")
+        self.refresh_logs_button = QPushButton("Обновить лог")
         self.refresh_logs_button.clicked.connect(self.refresh_logs)
         log_layout.addWidget(self.log_view)
         log_layout.addWidget(self.refresh_logs_button, alignment=Qt.AlignRight)
@@ -366,13 +366,13 @@ class MainWindow(QMainWindow):
             QMessageBox.information(
                 self,
                 "Адаптация",
-                "Android-зависимые поля не найдены.",
+                "Linux-адаптация не требуется.",
             )
             return False
 
         self.config_edit.setPlainText(result.text)
         profile = self.save_current_profile()
-        message = "Удалены Android-only поля:\n\n" + result.summary()
+        message = "Выполнены изменения для Linux:\n\n" + result.summary()
         if profile:
             message += "\n\nПрофиль сохранен."
         QMessageBox.information(self, "Адаптация под Linux", message)
@@ -479,9 +479,9 @@ class MainWindow(QMainWindow):
         self.active_profile_label.setText(f"Активный профиль: {text}")
 
     def refresh_logs(self) -> None:
-        result = self.service.recent_errors()
+        result = self.service.recent_logs()
         if result.ok:
-            text = result.stdout.strip() or "Ошибок в журнале не найдено."
+            text = result.stdout.strip() or "Записей в журнале sing-box не найдено."
         else:
             text = result.output or "Не удалось прочитать journalctl."
         self.log_view.setPlainText(text)

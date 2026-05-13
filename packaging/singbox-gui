@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+export PYTHONPATH=/opt/singbox-gui/src
+exec /opt/singbox-gui/venv/bin/python -m singbox_gui "$@"

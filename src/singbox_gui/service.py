@@ -10,6 +10,10 @@ from .paths import source_dir
 
 
 SERVICE_NAME = "sing-box"
+HELPER_PATHS = (
+    Path("/usr/lib/singbox-gui/singbox-gui-helper"),
+    Path("/usr/local/libexec/singbox-gui-helper"),
+)
 
 
 @dataclass(frozen=True)
@@ -44,13 +48,13 @@ class SingBoxService:
         return ServiceState(active_state, enabled_state, error)
 
     def start(self) -> CommandResult:
-        return self._privileged_systemctl("start")
+        return self._privileged_helper("start-service")
 
     def stop(self) -> CommandResult:
-        return self._privileged_systemctl("stop")
+        return self._privileged_helper("stop-service")
 
     def restart(self) -> CommandResult:
-        return self._privileged_systemctl("restart")
+        return self._privileged_helper("restart-service")
 
     def check_config(self, config_path: Path) -> CommandResult:
         return run_command(
@@ -59,16 +63,14 @@ class SingBoxService:
         )
 
     def deploy_config(self, config_path: Path) -> CommandResult:
-        return self._privileged_module("deploy-config", str(config_path))
+        return self._privileged_helper("deploy-config", str(config_path))
 
-    def recent_errors(self, lines: int = 80) -> CommandResult:
+    def recent_logs(self, lines: int = 80) -> CommandResult:
         return run_command(
             [
                 "journalctl",
                 "-u",
                 self.service_name,
-                "-p",
-                "warning..alert",
                 "-n",
                 str(lines),
                 "--no-pager",
@@ -96,3 +98,19 @@ class SingBoxService:
             ],
             timeout=120,
         )
+
+    def _privileged_helper(self, *args: str) -> CommandResult:
+        for helper_path in HELPER_PATHS:
+            if helper_path.exists():
+                return run_command(["pkexec", str(helper_path), *args], timeout=120)
+
+        if args == ("start-service",):
+            return self._privileged_systemctl("start")
+        if args == ("stop-service",):
+            return self._privileged_systemctl("stop")
+        if args == ("restart-service",):
+            return self._privileged_systemctl("restart")
+        if args and args[0] == "deploy-config":
+            return self._privileged_module("deploy-config", *args[1:])
+
+        return CommandResult(tuple(args), 127, "", "PolicyKit helper is not installed")

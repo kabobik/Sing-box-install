@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Singbox GUI
+Comment=Tray GUI for sing-box service
+Exec=/usr/bin/singbox-gui
+Icon=singbox-gui
+Terminal=false
+Categories=Network;Settings;
+StartupWMClass=singbox-gui

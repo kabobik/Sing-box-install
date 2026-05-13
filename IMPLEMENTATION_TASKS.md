@@ -8,6 +8,10 @@
 - `PySide6` установлен в локальный `.venv`.
 - GUI прошел offscreen smoke-test: `QApplication` и `MainWindow` создаются.
 - Добавлен Linux-адаптер конфига для Android-only полей.
+- Добавлен root-owned PolicyKit helper для управления `sing-box.service` без пароля после установки.
+- No-password flow проверен через `pkexec --disable-internal-agent`.
+- Тестовое применение копии текущего конфига через helper прошло успешно.
+- Добавлен сборщик `.deb` пакета с bundled `.venv`.
 - Для запуска из исходников: `bash scripts/run_dev.sh`.
 
 ## Milestone 0. Подготовка
@@ -28,7 +32,7 @@
 
 - [x] Обертка над `systemctl is-active`.
 - [x] Обертка над `systemctl is-enabled`.
-- [x] Обертки `start`, `stop`, `restart` через `pkexec`.
+- [x] Обертки `start`, `stop`, `restart` через PolicyKit helper.
 - [x] Чтение последних ошибок через `journalctl`.
 - [x] Проверка конфига через `sing-box check`.
 
@@ -66,9 +70,9 @@
 
 - [x] Генерация `.desktop` файла для `~/.config/autostart`.
 - [x] Автовключение автозапуска при старте GUI.
-- [ ] Install script.
-- [ ] `.deb` packaging.
-- [ ] PolicyKit action для helper после упаковки.
+- [x] Install script для PolicyKit helper.
+- [x] `.deb` packaging.
+- [x] PolicyKit action для helper после упаковки.
 
 ## Milestone 7. Полировка
 
